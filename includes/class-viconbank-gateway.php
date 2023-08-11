@@ -8,7 +8,7 @@
  * @class       WC_ViconBank_Gateway
  * @extends     WC_Payment_Gateway
  * @version     0.1.1
- * @package     WooCommerce\Classes\Payment
+ * @package     viconbank-woocommerce\Classes\Payment
  */
 
 class WC_ViconBank_Gateway extends WC_Payment_Gateway
@@ -48,6 +48,7 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 		$this->init_settings();
 
 		// Get settings.
+		$this->token 			  = $this->get_option('token');
 		$this->title              = $this->get_option('title');
 		$this->description        = $this->get_option('description');
 		$this->instructions       = $this->get_option('instructions');
@@ -55,12 +56,12 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 		$this->enable_for_virtual = $this->get_option('enable_for_virtual', 'yes') === 'yes';
 
 		// Actions.
-		add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
-		add_action('woocommerce_thankyou_' . $this->id, array($this, 'thankyou_page'));
-		add_filter('woocommerce_payment_complete_order_status', array($this, 'change_payment_complete_order_status'), 10, 3);
+		add_action('viconbank-woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
+		add_action('viconbank-woocommerce_thankyou_' . $this->id, array($this, 'thankyou_page'));
+		add_filter('viconbank-woocommerce_payment_complete_order_status', array($this, 'change_payment_complete_order_status'), 10, 3);
 
 		// Customer Emails.
-		add_action('woocommerce_email_before_order_table', array($this, 'email_instructions'), 10, 3);
+		add_action('viconbank-woocommerce_email_before_order_table', array($this, 'email_instructions'), 10, 3);
 	}
 
 	/**
@@ -69,9 +70,9 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 	protected function setup_properties()
 	{
 		$this->id                 = 'viconbank';
-		$this->icon 			  = apply_filters('woocommerce_viconbank_icon', plugins_url('/assets/icon.png', __FILE__));
-		$this->method_title       = __('ViconBank Pagamentos', 'woocommerce');
-		$this->method_description = __('Receba pagamentos em Pix ou Boleto!', 'woocommerce');
+		$this->icon 			  = apply_filters('viconbank-woocommerce_viconbank_icon', plugins_url('../assets/icon.png', __FILE__));
+		$this->method_title       = __('ViconBank Pagamentos', 'viconbank-woocommerce');
+		$this->method_description = __('Receba pagamentos em Pix ou Boleto!', 'viconbank-woocommerce');
 		$this->has_fields         = false;
 	}
 
@@ -82,49 +83,55 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 	{
 		$this->form_fields = array(
 			'enabled'            => array(
-				'title'       => __('Enable/Disable', 'woocommerce'),
-				'label'       => __('Ativar ViconBank Pagamentos', 'woocommerce'),
+				'title'       => __('Ativar/Desativar', 'viconbank-woocommerce'),
+				'label'       => __('Ativar ViconBank Pagamentos', 'viconbank-woocommerce'),
 				'type'        => 'checkbox',
 				'description' => '',
 				'default'     => 'no',
 			),
+			'token'              => array(
+				'title'       => __('Token', 'viconbank-woocommerce'),
+				'type'        => 'text',
+				'description' => __('Informe o token recebido após fazer a conexão com o ViconBank', 'viconbank-woocommerce'),
+				'desc_tip'    => true,
+			),
 			'title'              => array(
-				'title'       => __('Title', 'woocommerce'),
+				'title'       => __('Título', 'viconbank-woocommerce'),
 				'type'        => 'safe_text',
-				'description' => __('Título que o cliente verá no checkout', 'woocommerce'),
-				'default'     => __('ViconBank Pagamentos', 'woocommerce'),
+				'description' => __('Título que o cliente verá no checkout', 'viconbank-woocommerce'),
+				'default'     => __('ViconBank Pagamentos', 'viconbank-woocommerce'),
 				'desc_tip'    => true,
 			),
 			'description'        => array(
-				'title'       => __('Description', 'woocommerce'),
+				'title'       => __('Descrição', 'viconbank-woocommerce'),
 				'type'        => 'textarea',
-				'description' => __('Descrição sobre o método de pagamento', 'woocommerce'),
-				'default'     => __('Realize o pagamento através dop pix ou boleto', 'woocommerce'),
+				'description' => __('Descrição sobre o método de pagamento', 'viconbank-woocommerce'),
+				'default'     => __('Realize o pagamento através dop pix ou boleto', 'viconbank-woocommerce'),
 				'desc_tip'    => true,
 			),
 			'instructions'       => array(
-				'title'       => __('Instructions', 'woocommerce'),
+				'title'       => __('Instruções', 'viconbank-woocommerce'),
 				'type'        => 'textarea',
-				'description' => __('Instruções que são apresentadas na tela de agradecimento', 'woocommerce'),
-				'default'     => __('Você receberá seu comprovante por email', 'woocommerce'),
+				'description' => __('Instruções que são apresentadas na tela de agradecimento', 'viconbank-woocommerce'),
+				'default'     => __('Você receberá seu comprovante por email', 'viconbank-woocommerce'),
 				'desc_tip'    => true,
 			),
 			'enable_for_methods' => array(
-				'title'             => __('Enable for shipping methods', 'woocommerce'),
+				'title'             => __('Ativar para métodos de entrega', 'viconbank-woocommerce'),
 				'type'              => 'multiselect',
 				'class'             => 'wc-enhanced-select',
 				'css'               => 'width: 400px;',
 				'default'           => '',
-				'description'       => __('If viconbank is only available for certain methods, set it up here. Leave blank to enable for all methods.', 'woocommerce'),
+				'description'       => __('If viconbank is only available for certain methods, set it up here. Leave blank to enable for all methods.', 'viconbank-woocommerce'),
 				'options'           => $this->load_shipping_method_options(),
 				'desc_tip'          => true,
 				'custom_attributes' => array(
-					'data-placeholder' => __('Select shipping methods', 'woocommerce'),
+					'data-placeholder' => __('Select shipping methods', 'viconbank-woocommerce'),
 				),
 			),
 			'enable_for_virtual' => array(
-				'title'   => __('Accept for virtual orders', 'woocommerce'),
-				'label'   => __('Permitir o pagamento de produtos virtuais', 'woocommerce'),
+				'title'   => __('Aceitar pedidos virtuais', 'viconbank-woocommerce'),
+				'label'   => __('Permitir', 'viconbank-woocommerce'),
 				'type'    => 'checkbox',
 				'default' => 'yes',
 			),
@@ -160,7 +167,7 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 			}
 		}
 
-		$needs_shipping = apply_filters('woocommerce_cart_needs_shipping', $needs_shipping);
+		$needs_shipping = apply_filters('viconbank-woocommerce_cart_needs_shipping', $needs_shipping);
 
 		// Virtual order, with virtual disabled.
 		if (!$this->enable_for_virtual && !$needs_shipping) {
@@ -239,7 +246,7 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 			$options[$method->get_method_title()] = array();
 
 			// Translators: %1$s shipping method name.
-			$options[$method->get_method_title()][$method->id] = sprintf(__('Any &quot;%1$s&quot; method', 'woocommerce'), $method->get_method_title());
+			$options[$method->get_method_title()][$method->id] = sprintf(__('Any &quot;%1$s&quot; method', 'viconbank-woocommerce'), $method->get_method_title());
 
 			foreach ($zones as $zone) {
 
@@ -254,10 +261,10 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 					$option_id = $shipping_method_instance->get_rate_id();
 
 					// Translators: %1$s shipping method title, %2$s shipping method id.
-					$option_instance_title = sprintf(__('%1$s (#%2$s)', 'woocommerce'), $shipping_method_instance->get_title(), $shipping_method_instance_id);
+					$option_instance_title = sprintf(__('%1$s (#%2$s)', 'viconbank-woocommerce'), $shipping_method_instance->get_title(), $shipping_method_instance_id);
 
 					// Translators: %1$s zone name, %2$s shipping method instance name.
-					$option_title = sprintf(__('%1$s &ndash; %2$s', 'woocommerce'), $zone->get_id() ? $zone->get_zone_name() : __('Other locations', 'woocommerce'), $option_instance_title);
+					$option_title = sprintf(__('%1$s &ndash; %2$s', 'viconbank-woocommerce'), $zone->get_id() ? $zone->get_zone_name() : __('Other locations', 'viconbank-woocommerce'), $option_instance_title);
 
 					$options[$method->get_method_title()][$option_id] = $option_title;
 				}
@@ -338,8 +345,8 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 		$order = wc_get_order($order_id);
 
 		if ($order->get_total() > 0) {
-			// Mark as processing or on-hold (payment won't be taken until delivery).
-			$order->update_status(apply_filters('woocommerce_viconbank_process_payment_order_status', $order->has_downloadable_item() ? 'on-hold' : 'processing', $order), __('Payment to be made upon delivery.', 'woocommerce'));
+			//$order->payment_complete();
+			$this->viconbank_payment_processing($order);
 		} else {
 			$order->payment_complete();
 		}
@@ -352,6 +359,55 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 			'result'   => 'success',
 			'redirect' => $this->get_return_url($order),
 		);
+	}
+
+	private function viconbank_payment_processing($order)
+	{
+
+		$url('https://vicon.e-bancos.com.br/pix/pix/qrcode-externo');
+		$token = $this->token;
+		$total = intval($order->get_total());
+
+		$ch = curl_init($url);
+		# Setup request to send json via POST.
+		$payload = json_encode(array("valor" => $total, 'mensagem' => $order->get_order_id(), 'expiracao' => 3600));
+		curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+
+		curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type:application/json', 'Authorization: bearer ' . $token));
+		# Return response instead of printing.
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		# Send request.
+		$response = curl_exec($ch);
+		$result = json_decode($response);
+		curl_close($ch);
+
+
+		return $result;
+
+		// $response = wp_remote_post($url, array('timeout' => 45));
+
+		// if(is_wp_error($response)){
+		// 	$error_message = $response->get_error_message();
+		// 	return $error_message;
+		// }
+
+		// if(wp_remote_retrieve_response_code($response) !== 200){
+		// 	$order->update_status(apply_filters('viconbank-woocommerce_viconbank_process_payment_order_status', $order->has_downloadable_item() ? 'wc-invoiced' : 'processing', $order), __('Pagamento pendente.', 'viconbank-woocommerce'));
+		// }
+
+		// if(wp_remote_retrieve_response_code($response) === 200){
+		// 	$response_body = wp_remote_retrieve_body($response);
+		// 	if($response_body['message'] == 'Thank you! Your payment was successful'){
+		// 		$order->payment_complete();
+		// 	}
+		// }
+
+		/*
+		// Mark as processing or on-hold (payment won't be taken until delivery).
+		$order->update_status(apply_filters('viconbank-woocommerce_viconbank_process_payment_order_status', $order->has_downloadable_item() ? 'wc-invoiced' : 'processing', $order), __('Pagamento pendente.', 'viconbank-woocommerce'));
+
+		$order->payment_complete();
+		*/
 	}
 
 	/**

@@ -40,7 +40,8 @@ add_action('plugins_loaded', 'viconbank_init', 11);
 function viconbank_init()
 {
 	if (class_exists('WC_Payment_Gateway')) {
-		require_once plugins_url( '/includes/class-viconbank-gateway.php', _FILE_ )
+		require_once plugin_dir_path( __FILE__ ) . '/includes/class-viconbank-gateway.php';
+		require_once plugin_dir_path( __FILE__ ) . '/includes/viconbank-order-status.php';
 	}
 }
 
