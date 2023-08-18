@@ -36,6 +36,8 @@ if (!in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get
 
 //função permite ativação de plugin
 add_action('plugins_loaded', 'viconbank_init', 11);
+add_filter('woocommerce_payment_gateways', 'add_to_woo_viconbank_payment_gateway');
+
 
 function viconbank_init()
 {
@@ -44,8 +46,6 @@ function viconbank_init()
 		require_once plugin_dir_path( __FILE__ ) . '/includes/viconbank-order-status.php';
 	}
 }
-
-add_filter('woocommerce_payment_gateways', 'add_to_woo_viconbank_payment_gateway');
 
 function add_to_woo_viconbank_payment_gateway($gateways){
    $gateways[] = 'WC_ViconBank_Gateway';
