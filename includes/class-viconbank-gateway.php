@@ -61,7 +61,7 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway {
 		$this->token			  = __('Adicionar Token', 'viconbank-woocommerce');
 		$this->icon               = apply_filters( 'viconbank-woocommerce_viconbank_icon', plugins_url('../assets/icon.png', __FILE__) );
 		$this->method_title       = __( 'ViconBank Pagamentos', 'viconbank-woocommerce' );
-		$this->method_description = __( 'Receba pagamentos em Pix', 'viconbank-woocommerce' );
+		$this->method_description = __( 'Receba pagamentos em Pix utilizando sua conta ViconBank', 'viconbank-woocommerce' );
 		$this->has_fields         = false;
 	}
 
@@ -189,13 +189,6 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway {
 			// phpcs:enable WordPress.Security.NonceVerification
 
 			return true;
-		}
-
-		if ( Constants::is_true( 'REST_REQUEST' ) ) {
-			global $wp;
-			if ( isset( $wp->query_vars['rest_route'] ) && false !== strpos( $wp->query_vars['rest_route'], '/payment_gateways' ) ) {
-				return true;
-			}
 		}
 
 		return false;
