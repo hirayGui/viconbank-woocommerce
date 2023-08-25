@@ -56,12 +56,6 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 		add_action('woocommerce_thankyou_' . $this->id, array($this, 'thankyou_page'));
 		add_filter('woocommerce_payment_complete_order_status', array($this, 'change_payment_complete_order_status'), 10, 3);
 
-		add_filter('kses_allowed_protocols', function ($protocols) {
-			$protocols[] = 'data';
-		
-			return $protocols;
-		});
-
 		// Customer Emails.
 		add_action('woocommerce_email_before_order_table', array($this, 'email_instructions'), 10, 3);
 	}
@@ -74,8 +68,8 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 		$this->id                 = 'viconbank';
 		$this->token			  = __('Adicionar Token', 'viconbank-woocommerce');
 		$this->icon               = apply_filters('viconbank-woocommerce_viconbank_icon', plugins_url('../assets/icon.png', __FILE__));
-		$this->method_title       = __('ViconBank Pagamentos', 'viconbank-woocommerce');
-		$this->method_description = __('Receba pagamentos em Pix utilizando sua conta', 'viconbank-woocommerce');
+		$this->method_title       = __('Pix', 'viconbank-woocommerce');
+		$this->method_description = __('Receba pagamentos em Pix utilizando sua conta ViconBank', 'viconbank-woocommerce');
 		$this->has_fields         = false;
 	}
 
@@ -119,19 +113,19 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 				'default'     => __('Escaneie o código QR para realizar o pagamento!', 'viconbank-woocommerce'),
 				'desc_tip'    => true,
 			),
-			'enable_for_methods' => array(
-				'title'             => __('Ativar métodos de entrega', 'viconbank-woocommerce'),
-				'type'              => 'multiselect',
-				'class'             => 'wc-enhanced-select',
-				'css'               => 'width: 400px;',
-				'default'           => '',
-				'description'       => __('If viconbank is only available for certain methods, set it up here. Leave blank to enable for all methods.', 'viconbank-woocommerce'),
-				'options'           => $this->load_shipping_method_options(),
-				'desc_tip'          => true,
-				'custom_attributes' => array(
-					'data-placeholder' => __('Select shipping methods', 'viconbank-woocommerce'),
-				),
-			),
+			// 'enable_for_methods' => array(
+			// 	'title'             => __('Ativar métodos de entrega', 'viconbank-woocommerce'),
+			// 	'type'              => 'multiselect',
+			// 	'class'             => 'wc-enhanced-select',
+			// 	'css'               => 'width: 400px;',
+			// 	'default'           => '',
+			// 	'description'       => __('If viconbank is only available for certain methods, set it up here. Leave blank to enable for all methods.', 'viconbank-woocommerce'),
+			// 	'options'           => $this->load_shipping_method_options(),
+			// 	'desc_tip'          => true,
+			// 	'custom_attributes' => array(
+			// 		'data-placeholder' => __('Select shipping methods', 'viconbank-woocommerce'),
+			// 	),
+			// ),
 		);
 	}
 
@@ -457,10 +451,35 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 	public function change_payment_complete_order_status($status, $order_id = 0, $order = false)
 	{
 
+		$url = 'https://vicon.e-bancos.com.br/index.php?r=pix/pix/consulta-qrcode-externo';
 
-		if ($order && 'viconbank' === $order->get_payment_method()) {
-			$status = 'completed';
+		$id_transaction = $order->get_meta('id_transacao');
+
+		//fazendo a requisição e já atribuindo o seu retorno a uma variável
+		$response = wp_remote_post(
+			$url,
+			[
+				'headers' => [
+					'Authorization' => 'Bearer ' . $this->token,
+				],
+				'body' => json_encode([
+					'transaction_id' => $id_transaction,
+				],)
+			]
+		);
+
+		if(!is_wp_error($response)){
+			//$body recebe o corpo da resposta da requisição
+			$body = wp_remote_retrieve_body($response);
+
+			//$data recebe a resposta da requisição traduzida para array PHP
+			$data = json_decode($body, true);
+
+			if ($data['pago'] != false) {
+				$status = 'completed';
+			}
 		}
+
 		return $status;
 	}
 
