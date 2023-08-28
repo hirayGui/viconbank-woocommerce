@@ -71,6 +71,7 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 		$this->method_title       = __('Pix', 'viconbank-woocommerce');
 		$this->method_description = __('Receba pagamentos em Pix utilizando sua conta ViconBank', 'viconbank-woocommerce');
 		$this->has_fields         = false;
+		$this->instructions 	  = __('Escaneie o código QR para realizar o pagamento!', 'viconbank-woocommerce');
 	}
 
 	/**
@@ -106,26 +107,6 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 				'default'     => __('Realize o pagamento através de Pix!', 'viconbank-woocommerce'),
 				'desc_tip'    => true,
 			),
-			'instructions'       => array(
-				'title'       => __('Instruções', 'viconbank-woocommerce'),
-				'type'        => 'textarea',
-				'description' => __('Instrução que serão apresentadas na tela de agradecimento', 'viconbank-woocommerce'),
-				'default'     => __('Escaneie o código QR para realizar o pagamento!', 'viconbank-woocommerce'),
-				'desc_tip'    => true,
-			),
-			// 'enable_for_methods' => array(
-			// 	'title'             => __('Ativar métodos de entrega', 'viconbank-woocommerce'),
-			// 	'type'              => 'multiselect',
-			// 	'class'             => 'wc-enhanced-select',
-			// 	'css'               => 'width: 400px;',
-			// 	'default'           => '',
-			// 	'description'       => __('If viconbank is only available for certain methods, set it up here. Leave blank to enable for all methods.', 'viconbank-woocommerce'),
-			// 	'options'           => $this->load_shipping_method_options(),
-			// 	'desc_tip'          => true,
-			// 	'custom_attributes' => array(
-			// 		'data-placeholder' => __('Select shipping methods', 'viconbank-woocommerce'),
-			// 	),
-			// ),
 		);
 	}
 
@@ -427,16 +408,21 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 		//buscando informações do pedido
 		$order = wc_get_order($order_id);
 		$order_data = $order->get_meta('qr_code');
+		$copia_cola = $order->get_meta('pix_cod');
 
 		//apresentando qr_code
 		$finalImage = '<img src="data:image/png;base64,' .$order_data .'" id="imageQRCode" alt="QR Code" class="qrcode" style="display: block;margin-left: auto;margin-right: auto;"/>';
 		echo $finalImage;
 		
-		if ($this->instructions) {
-			echo '<div style="font-size: 20px;color: #303030;text-align: center;">';
-			echo wp_kses_post(wpautop(wptexturize($this->instructions)));
-			echo '</div>';
-		}
+	
+		echo '<div style="font-size: 20px;color: #303030;text-align: center;">';
+		echo wp_kses_post(wpautop(wptexturize($this->instructions)));
+
+		echo 'Ou copie e cole a seguinte chave pix em seu aplicativo de banco para realizar o pagamento:';
+		echo '<blockquote>' . $copia_cola . '</blockquote>';
+		echo '</div>';
+
+		
 	}
 
 	/**
