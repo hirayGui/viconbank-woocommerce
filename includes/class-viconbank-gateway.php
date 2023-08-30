@@ -54,10 +54,91 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 		add_action('woocommerce_update_options_payment_gateways_' . $this->id, array($this, 'process_admin_options'));
 
 		add_action('woocommerce_thankyou_' . $this->id, array($this, 'thankyou_page'));
-		add_filter('woocommerce_payment_complete_order_status', array($this, 'change_payment_complete_order_status'), 10, 3);
+		
+		// add_action	('woocommerce_payment_complete', 'vicon_complete');
+
+		//função verifica se pagamentos forma efetuados
+		add_action('rest_api_init', array($this, 'viconbank_check_payment_status'), 10);
+		
 
 		// Customer Emails.
 		add_action('woocommerce_email_before_order_table', array($this, 'email_instructions'), 10, 3);
+	}
+
+	public function viconbank_check_payment_status(){
+		function debug_to_console($data) {
+			$output = $data;
+			if (is_array($output))
+				$output = implode(',', $output);
+		
+			echo "<script>console.log('Debug Objects: " . $output . "' );</script>";
+		}
+
+		//buscando todos os pedidos que estão com o status 'pagamento pendente'
+		$orders = wc_get_orders(array(
+			'status' => 'wc-pending'
+		));
+
+		$url = 'https://vicon.e-bancos.com.br/index.php?r=pix/pix/consulta-qrcode-externo';
+		//checando se o array não está vazio
+		if($orders != null){
+
+			foreach($orders as $single_order){
+				
+				$id_transaction = $single_order->get_meta('id_transacao');
+
+				debug_to_console("este é o id:" . $id_transaction);
+
+				if($id_transaction > 0){
+					$request = json_encode(['transaction_id' => $id_transaction]);
+					//fazendo a requisição e já atribuindo o seu retorno a uma variável
+					$response = wp_remote_post(
+						$url,
+						[
+							'headers' => [
+								'Authorization' => 'Bearer ' . $this->token,
+							],
+							'body' => $request,
+						]
+					);
+
+					if ($response['response']['code'] === 401) {
+						return [
+							'result' => 'fail',
+						];
+					}
+			
+					if ($response['response']['code'] != 200) {
+						return [
+							'result' => 'fail',
+						];
+					}
+
+					if(!is_wp_error($response)){
+
+						//$body recebe o corpo da resposta da requisição
+						$body = wp_remote_retrieve_body($response);
+
+						//$data recebe a resposta da requisição traduzida para array PHP
+						$data_request = json_decode($body, true);
+
+						debug_to_console($data_request);
+
+						if ($data_request['pago'] == true) {
+							$single_order->update_meta_data('pago', true);
+							$single_order->update_status('completed');
+						}else{
+							$single_order->update_status('pending');
+						}
+					}
+				}
+			}
+		}else{
+			return array(
+				'result' => 'fail'
+			);
+		}
+
 	}
 
 	/**
@@ -109,6 +190,7 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 			),
 		);
 	}
+
 
 	/**
 	 * Check If The Gateway Is Available For Use.
@@ -396,6 +478,8 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 				'result'   => 'success',
 				'redirect' => $this->get_return_url($order),
 			);
+		} else{
+			return ['result' => 'fail'];
 		}
 	}
 	
@@ -421,25 +505,15 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 		echo 'Ou copie e cole a seguinte chave pix em seu aplicativo de banco para realizar o pagamento:';
 		echo '<blockquote>' . $copia_cola . '</blockquote>';
 		echo '</div>';
-
-		
 	}
 
-	/**
-	 * Change payment complete order status to completed for viconbank orders.
-	 *
-	 * @since  3.1.0
-	 * @param  string         $status Current order status.
-	 * @param  int            $order_id Order ID.
-	 * @param  WC_Order|false $order Order object.
-	 * @return string
-	 */
-	public function change_payment_complete_order_status($status, $order_id = 0, $order = false)
-	{
-
+	
+	public function vicon_complete($order_id){
+		$order = wc_get_order($order_id);
+		
 		$url = 'https://vicon.e-bancos.com.br/index.php?r=pix/pix/consulta-qrcode-externo';
 
-		$id_transaction = $order->get_meta('id_transacao');
+		$id_transaction = intval($order->get_meta('id_transacao'));
 
 		//fazendo a requisição e já atribuindo o seu retorno a uma variável
 		$response = wp_remote_post(
@@ -461,12 +535,14 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 			//$data recebe a resposta da requisição traduzida para array PHP
 			$data = json_decode($body, true);
 
-			if ($data['pago'] != false) {
-				$status = 'completed';
+			if ($data['pago'] === true) {
+				$order->update_meta_data('pago', true);
+				$order->payment_complete();
+			}else{
+				$order->update_status('pending');
 			}
-		}
-
-		return $status;
+		}	
+	
 	}
 
 	/**
