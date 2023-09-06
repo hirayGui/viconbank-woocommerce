@@ -6,7 +6,7 @@
  * Author: Gizo Digital
  * Author URI: 
  * Description: Este plugin permite que sua loja virtual possa aceitar pagamentos através de Pix utilizando sua conta ViconBank
- * Version: 0.1.2
+ * Version: 1.0.0
  * License:     GPL-2.0+
  * License URL: http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain: viconbank-woocommerce
