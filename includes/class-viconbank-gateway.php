@@ -24,6 +24,8 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 
 	public $data;
 
+	public $auth_url = 'https://vicon.e-bancos.com.br/index.php?r=utilitarios/conexao-api';
+
 	/**
 	 * Enable for shipping methods.
 	 *
@@ -66,14 +68,6 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 	}
 
 	public function viconbank_check_payment_status(){
-		function debug_to_console($data) {
-			$output = $data;
-			if (is_array($output))
-				$output = implode(',', $output);
-		
-			echo "<script>console.log('Debug Objects: " . $output . "' );</script>";
-		}
-
 		//buscando todos os pedidos que estão com o status 'pagamento pendente'
 		$orders = wc_get_orders(array(
 			'status' => 'wc-pending'
@@ -83,55 +77,74 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 		//checando se o array não está vazio
 		if($orders != null){
 
-			foreach($orders as $single_order){
+			//fazendo verificação de token
+			$auth_response = wp_remote_get(
+				$this->auth_url,
+				[
+					'headers' => [
+						'Authorization' => 'Bearer ' . $this->token,
+					],
+				]
+			); 
+
+			if($auth_response['response']['code'] != 200) {
+				return [
+					'result' => 'fail',
+				];
+			}//if ($auth_response['response']['code'] != 200)
+
+			//recuperando token retornado da requisição
+			if(!is_wp_error($auth_response)){
+				$auth_body = wp_remote_retrieve_body($auth_response);
+				$auth_data = json_decode($auth_body, true);
+
+				foreach($orders as $single_order){
+					$id_transaction = $single_order->get_meta('id_transacao');
+
+					if($id_transaction > 0){
+						$request = json_encode(['transaction_id' => $id_transaction]);
+						//fazendo a requisição e já atribuindo o seu retorno a uma variável
+						$response = wp_remote_post(
+							$url,
+							[
+								'headers' => [
+									'Authorization' => 'Bearer ' . $auth_data['msg'],
+								],
+								'body' => $request,
+							]
+						);
+
+						//verificando código recebido da requisição
+						if ($response['response']['code'] === 401) {
+							return [
+								'result' => 'fail',
+							];
+						}//$response['response']['code'] === 401
 				
-				$id_transaction = $single_order->get_meta('id_transacao');
+						if ($response['response']['code'] != 200) {
+							return [
+								'result' => 'fail',
+							];
+						}//$response['response']['code'] != 200
 
-				debug_to_console("este é o id:" . $id_transaction);
+						if(!is_wp_error($response)){
 
-				if($id_transaction > 0){
-					$request = json_encode(['transaction_id' => $id_transaction]);
-					//fazendo a requisição e já atribuindo o seu retorno a uma variável
-					$response = wp_remote_post(
-						$url,
-						[
-							'headers' => [
-								'Authorization' => 'Bearer ' . $this->token,
-							],
-							'body' => $request,
-						]
-					);
+							//$body recebe o corpo da resposta da requisição
+							$body = wp_remote_retrieve_body($response);
 
-					if ($response['response']['code'] === 401) {
-						return [
-							'result' => 'fail',
-						];
-					}
-			
-					if ($response['response']['code'] != 200) {
-						return [
-							'result' => 'fail',
-						];
-					}
+							//$data recebe a resposta da requisição traduzida para array PHP
+							$data_request = json_decode($body, true);
 
-					if(!is_wp_error($response)){
-
-						//$body recebe o corpo da resposta da requisição
-						$body = wp_remote_retrieve_body($response);
-
-						//$data recebe a resposta da requisição traduzida para array PHP
-						$data_request = json_decode($body, true);
-
-						debug_to_console($data_request);
-
-						if ($data_request['pago'] == true) {
-							$single_order->update_meta_data('pago', true);
-							$single_order->update_status('completed');
-						}else{
-							$single_order->update_status('pending');
-						}
-					}
-				}
+							//atualizando status do pedido de acordo com status de pagamento
+							if ($data_request['pago'] == true) {
+								$single_order->update_meta_data('pago', true);
+								$single_order->update_status('completed');
+							}else{
+								$single_order->update_status('pending');
+							}
+						}//!is_wp_error($response)
+					}//$id_transaction > 0
+				}//foreach($orders as $single_order)
 			}
 		}else{
 			return array(
@@ -139,7 +152,7 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 			);
 		}
 
-	}
+	}//public function viconbank_check_payment_status()
 
 	/**
 	 * Setup general properties for the gateway.
@@ -391,94 +404,116 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 	 */
 	public function process_payment($order_id)
 	{
-
-		//requisição por wp_remote_post
+		//recuperando informações osbre o pedido
 		$order = wc_get_order($order_id);
 
-		$url = 'https://vicon.e-bancos.com.br/index.php?r=pix/pix/qrcode-externo';
-
+		//endpoint para emitir pagamento em pix
+		$url = 'https://vicon.e-bancos.com.br/index.php?r=pix/pix/gerar-qrcode-pix-acesso-externo-token';
 		$cart_total = $this->get_order_total();
 
-		//fazendo a requisição e já atribuindo o seu retorno a uma variável
-		$response = wp_remote_post(
-			$url,
+		//fazendo verificação de token
+		$auth_response = wp_remote_get(
+			$this->auth_url,
 			[
 				'headers' => [
 					'Authorization' => 'Bearer ' . $this->token,
 				],
-				'body' => json_encode([
-					'valor' => $cart_total,
-					'mensagem' => $order_id,
-					'expiracao' => 3600,
-				],)
 			]
-		);
+		); 
 
-		if ($response['response']['code'] === 401) {
-			wc_add_notice(
-				__('Token inválido!', 'viconbank-woocommerce'),
-				'error'
-			);
-
+		if($auth_response['response']['code'] != 200) {
 			return [
 				'result' => 'fail',
 			];
-		}
+		}//if ($auth_response['response']['code'] != 200)
 
-		if ($response['response']['code'] != 200) {
-			wc_add_notice(
-				__('Erro ao criar chave pix, tente de novo.', 'viconbank-woocommerce'),
-				'error'
+		if(!is_wp_error($auth_response)){
+			$auth_body = wp_remote_retrieve_body($auth_response);
+			$auth_data = json_decode($auth_body, true);
+
+			//fazendo a requisição e já atribuindo o seu retorno a uma variável
+			$response = wp_remote_post(
+				$url,
+				[
+					'headers' => [
+						'Authorization' => 'Bearer ' . $auth_data['msg'],
+					],
+					'body' => json_encode([
+						'valor' => $cart_total,
+						'mensagem' => $order_id,
+						'expiracao' => 3600,
+					],)
+				]
 			);
 
-			return [
-				'result' => 'fail',
-			];
-		}
+			if ($response['response']['code'] === 401) {
+				wc_add_notice(
+					__('Token inválido!', 'viconbank-woocommerce'),
+					'error'
+				);
 
-		//caso requisição seja um sucesso, aplicação já continua com o pagamento
-		if (!is_wp_error($response)) {
-			//$body recebe o corpo da resposta da requisição
-			$body = wp_remote_retrieve_body($response);
-
-			//$data recebe a resposta da requisição traduzida para array PHP
-			$this->data = json_decode($body, true);
-
-			//dados da requisição bem-sucedida são adicionados às informações do pedido
-			$meta_data = [
-				'id_transacao' => $this->data['transaction_id'],
-				'qr_code' => $this->data['qrcode'],
-				'pix_cod' => $this->data['copia_cola'],
-				'data_expiracao' => $this->data['expiracao'],
-				'data_criacao' => $this->data['data_criacao'],
-			];
-
-			foreach ($meta_data as $key => $value) {
-				$order->update_meta_data($key, $value);
+				return [
+					'result' => 'fail',
+				];
 			}
 
-			$order->save();
+			if ($response['response']['code'] != 200) {
+				wc_add_notice(
+					__('Erro ao criar chave pix, tente de novo.', 'viconbank-woocommerce'),
+					'error'
+				);
 
-			//informando que o pagamento do pedido está pendente
-			$order->update_status(
-				$this->status_when_waiting,
-				__('ViconBank: O pix foi emitido, mas o pagamento ainda não foi realizado.', 'viconbank-woocomerce')
-			);
+				return [
+					'result' => 'fail',
+				];
+			}
 
-			//adicionando a chave pix como anotação do pedido
-			$order->add_order_note(
-				__("ViconBank Chave pix:" . $this->data['copia_cola'], 'viconbank-woocommerce')
-			);
+			//caso requisição seja um sucesso, aplicação já continua com o pagamento
+			if (!is_wp_error($response)) {
+				//$body recebe o corpo da resposta da requisição
+				$body = wp_remote_retrieve_body($response);
 
-			// Remove cart.
-			WC()->cart->empty_cart();
+				//$data recebe a resposta da requisição traduzida para array PHP
+				$this->data = json_decode($body, true);
 
-			// Return thankyou redirect.
-			return array(
-				'result'   => 'success',
-				'redirect' => $this->get_return_url($order),
-			);
-		} else{
+				//dados da requisição bem-sucedida são adicionados às informações do pedido
+				$meta_data = [
+					'id_transacao' => $this->data['transaction_id'],
+					'qr_code' => $this->data['qrcode'],
+					'pix_cod' => $this->data['copia_cola'],
+					'data_expiracao' => $this->data['expiracao'],
+					'data_criacao' => $this->data['data_criacao'],
+				];
+
+				foreach ($meta_data as $key => $value) {
+					$order->update_meta_data($key, $value);
+				}
+
+				$order->save();
+
+				//informando que o pagamento do pedido está pendente
+				$order->update_status(
+					$this->status_when_waiting,
+					__('ViconBank: O pix foi emitido, mas o pagamento ainda não foi realizado.', 'viconbank-woocomerce')
+				);
+
+				//adicionando a chave pix como anotação do pedido
+				$order->add_order_note(
+					__("ViconBank Chave pix:" . $this->data['copia_cola'], 'viconbank-woocommerce')
+				);
+
+				// Remove cart.
+				WC()->cart->empty_cart();
+
+				// Return thankyou redirect.
+				return array(
+					'result'   => 'success',
+					'redirect' => $this->get_return_url($order),
+				);
+			} else{
+				return ['result' => 'fail'];
+			}
+		}else{
 			return ['result' => 'fail'];
 		}
 	}
