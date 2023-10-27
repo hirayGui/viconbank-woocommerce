@@ -184,8 +184,7 @@ class WC_ViconBank_Gateway extends WC_Payment_Gateway
 			'token'              => array(
 				'title'       => __('Token', 'viconbank-woocommerce'),
 				'type'        => 'text',
-				'description' => __('Informe o token recebido após fazer a conexão com o ViconBank', 'viconbank-woocommerce'),
-				'desc_tip'    => true,
+				'description' => '<a href="https://relacionamento.viconbank.com.br/" target="_blank">Clique aqui para receber seu token</a>',
 			),
 			'title'              => array(
 				'title'       => __('Título', 'viconbank-woocommerce'),
